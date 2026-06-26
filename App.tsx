@@ -111,9 +111,9 @@ const App: React.FC = () => {
             setIsSyncing(false);
           });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to generate:", error);
-      alert("Gagal membuat konten. Coba lagi.");
+      alert(`Gagal membuat konten: ${error.message || "Terjadi kesalahan. Coba lagi."}`);
     } finally {
       setLoading(false);
     }
