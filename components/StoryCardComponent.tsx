@@ -27,12 +27,13 @@ const StoryCardComponent: React.FC<StoryCardProps> = ({ card, innerRef }) => {
 
   // Dynamic Font Sizing Logic
   // Prevents text from hitting the edges (Safety Zone)
+  // Adjusted for p-12 (48px) padding = 360 - 96 = 264px content width
   const getDynamicFontSize = (textLength: number) => {
-    if (textLength < 40) return 'text-[34px] leading-[1.2]';
-    if (textLength < 80) return 'text-[28px] leading-[1.3]';
-    if (textLength < 140) return 'text-[22px] leading-[1.4]';
-    if (textLength < 220) return 'text-[18px] leading-[1.5]';
-    return 'text-[15px] leading-[1.5]';
+    if (textLength < 30) return 'text-[32px] leading-[1.25]';
+    if (textLength < 70) return 'text-[26px] leading-[1.35]';
+    if (textLength < 130) return 'text-[20px] leading-[1.45]';
+    if (textLength < 210) return 'text-[17px] leading-[1.55]';
+    return 'text-[14px] leading-[1.6]';
   };
 
   const fontSizeClass = getDynamicFontSize(card.text.length);
@@ -61,7 +62,7 @@ const StoryCardComponent: React.FC<StoryCardProps> = ({ card, innerRef }) => {
   return (
     <div 
       ref={innerRef}
-      className={`relative w-[360px] h-[640px] ${bgClass} flex flex-col justify-center p-10 overflow-hidden shadow-2xl rounded-sm transition-colors duration-500`}
+      className={`relative w-[360px] h-[640px] ${bgClass} flex flex-col justify-center p-12 overflow-hidden shadow-2xl rounded-sm transition-colors duration-500`}
       style={{ 
         color: card.textColor,
         fontFamily: "'Plus Jakarta Sans', sans-serif" 

@@ -1,7 +1,7 @@
 import { StoryCard, HistorySession } from '../types';
 
 export const syncToGoogleSheet = async (scriptUrl: string, prompt: string, cards: StoryCard[]) => {
-  if (!scriptUrl) return;
+  if (!scriptUrl) return false;
 
   try {
     const payload = {
@@ -15,16 +15,18 @@ export const syncToGoogleSheet = async (scriptUrl: string, prompt: string, cards
       }))
     };
 
+    // Using 'text/plain' content-type avoids CORS preflight OPTIONS request
+    // Google Apps Script can parse this stringified body easily
     await fetch(scriptUrl, {
       method: 'POST',
       mode: 'no-cors', 
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type': 'text/plain;charset=utf-8', 
       },
       body: JSON.stringify(payload)
     });
     
-    console.log("Data sent to Google Sheet successfully");
+    console.log("Data sent to Google Sheet (opaque response due to no-cors)");
     return true;
   } catch (error) {
     console.error("Failed to sync to Google Sheet:", error);
@@ -71,8 +73,12 @@ export const fetchHistoryFromGoogleSheet = async (scriptUrl: string): Promise<Hi
     };
 
     data.forEach((row: any) => {
+      // Handle various case sensitivity from Sheet headers
       const timestampStr = row.Timestamp || row.timestamp;
       const prompt = row.Prompt || row.prompt;
+      
+      if (!timestampStr || !prompt) return;
+
       const sessionKey = `${timestampStr}_${prompt}`;
 
       if (!sessionStyles.has(sessionKey)) {
@@ -95,12 +101,13 @@ export const fetchHistoryFromGoogleSheet = async (scriptUrl: string): Promise<Hi
           id: String(row['Card ID'] || row.cardId || Math.random().toString()),
           text: row.Text || row.text || "",
           vibe: row.Vibe || row.vibe || "vibes",
-          bgGradient: style.bg,
+          // Fallback to style if not in sheet, or use row data if you added columns F/G
+          bgGradient: row.Gradient || row.bgGradient || style.bg,
+          textColor: row.Color || row.textColor || '#ffffff',
           fontFamily: style.font,
           iconName: 'Sparkles',
           fontWeight: 'medium',
           alignment: 'center',
-          textColor: '#ffffff',
           highlightColor: 'rgba(255,255,255,0.15)',
           accentColor: style.accent,
           emojis: style.emojis

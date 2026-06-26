@@ -3,10 +3,11 @@ import { generateStoryContent } from './services/geminiService';
 import { syncToGoogleSheet, fetchHistoryFromGoogleSheet } from './services/googleSheetService';
 import { StoryCard, HistorySession } from './types';
 import StoryCardComponent from './components/StoryCardComponent';
+import SettingsModal from './components/SettingsModal';
 import { toJpeg } from 'html-to-image';
-import { Loader2, Download, Send, RefreshCw, Layers, History, FileSpreadsheet, ArrowLeft, Trash2, CheckCircle2, CloudLightning } from 'lucide-react';
+import { Loader2, Download, Send, RefreshCw, Layers, History, FileSpreadsheet, ArrowLeft, Trash2, CheckCircle2, CloudLightning, Settings } from 'lucide-react';
 
-const GOOGLE_SCRIPT_URL: string = "https://script.google.com/macros/s/AKfycbz-ttPSV5HwN1ix5s3HioIDWEs_IGcohYB-2cxBRIb6CB9SIu_n2VO0z1MKL9jDi3xt/exec"; 
+const DEFAULT_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxb1TkExgro6xdDOLMtYHenasSyYEf5N9e9HXJtoQ9QRa-kWS86qrmRXBDLrIPsMWkg3Q/exec"; 
 
 const App: React.FC = () => {
   const [prompt, setPrompt] = useState('');
@@ -17,6 +18,10 @@ const App: React.FC = () => {
   const [history, setHistory] = useState<HistorySession[]>([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  
+  // Settings State
+  const [scriptUrl, setScriptUrl] = useState(DEFAULT_SCRIPT_URL);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
 
@@ -29,15 +34,22 @@ const App: React.FC = () => {
         console.error("Failed to load local history", e);
       }
     }
+    
+    const savedUrl = localStorage.getItem('googleScriptUrl');
+    if (savedUrl) {
+      setScriptUrl(savedUrl);
+    }
   }, []);
 
   useEffect(() => {
     const loadCloudHistory = async () => {
-      if (view === 'archive' && GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL.length > 10) {
+      if (view === 'archive' && scriptUrl && scriptUrl.length > 10) {
         setIsHistoryLoading(true);
         try {
-          const cloudSessions = await fetchHistoryFromGoogleSheet(GOOGLE_SCRIPT_URL);
+          const cloudSessions = await fetchHistoryFromGoogleSheet(scriptUrl);
           if (cloudSessions.length > 0) {
+             // Merge strategy could be improved, currently just replaces or appends if implemented fully
+             // For now, let's just use cloud history if available or mix
              setHistory(cloudSessions);
           }
         } catch (e) {
@@ -48,7 +60,12 @@ const App: React.FC = () => {
       }
     };
     loadCloudHistory();
-  }, [view]);
+  }, [view, scriptUrl]);
+
+  const saveSettings = (url: string) => {
+    setScriptUrl(url);
+    localStorage.setItem('googleScriptUrl', url);
+  };
 
   const saveToHistory = (newPrompt: string, newCards: StoryCard[]) => {
     const newSession: HistorySession = {
@@ -80,12 +97,11 @@ const App: React.FC = () => {
       setCards(response.cards);
       saveToHistory(prompt, response.cards);
       
-      // Explicitly handle sheet sync immediately after generation
-      if (GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL.length > 10) {
+      // Auto-sync
+      if (scriptUrl && scriptUrl.length > 10) {
         console.log("Starting background sync to Google Sheet...");
         setIsSyncing(true);
-        // Fire and forget, don't block UI but ensure it triggers
-        syncToGoogleSheet(GOOGLE_SCRIPT_URL, prompt, response.cards)
+        syncToGoogleSheet(scriptUrl, prompt, response.cards)
           .then(() => {
             console.log("Sync completed");
             setIsSyncing(false);
@@ -100,6 +116,28 @@ const App: React.FC = () => {
       alert("Gagal membuat konten. Coba lagi.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleManualSync = async () => {
+    if (!scriptUrl || scriptUrl.length < 10) {
+      setIsSettingsOpen(true);
+      return;
+    }
+    if (cards.length === 0) return;
+
+    setIsSyncing(true);
+    try {
+      const success = await syncToGoogleSheet(scriptUrl, prompt, cards);
+      if (success) {
+        alert("Data berhasil disimpan ke Google Sheet!");
+      } else {
+        alert("Gagal menyimpan. Cek URL Script di Settings.");
+      }
+    } catch (e) {
+      alert("Terjadi kesalahan koneksi.");
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -152,6 +190,13 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-950 text-white font-sans selection:bg-indigo-500">
+      <SettingsModal 
+        isOpen={isSettingsOpen} 
+        onClose={() => setIsSettingsOpen(false)} 
+        onSave={saveSettings} 
+        initialUrl={scriptUrl} 
+      />
+
       {/* Header */}
       <header className="sticky top-0 z-50 bg-slate-950/80 backdrop-blur-md border-b border-slate-900 px-4 py-3">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
@@ -162,19 +207,27 @@ const App: React.FC = () => {
             <h1 className="text-lg md:text-xl font-bold tracking-tight">gusdiuma</h1>
           </div>
           
-          <div className="flex bg-slate-900 rounded-lg p-1">
+          <div className="flex items-center gap-2">
+            <div className="flex bg-slate-900 rounded-lg p-1 mr-2">
+              <button 
+                onClick={() => setView('generator')}
+                className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-all ${view === 'generator' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/40' : 'text-slate-400'}`}
+              >
+                Generator
+              </button>
+              <button 
+                onClick={() => setView('archive')}
+                className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-all flex items-center gap-1.5 ${view === 'archive' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/40' : 'text-slate-400'}`}
+              >
+                <History size={14} />
+                Arsip
+              </button>
+            </div>
             <button 
-              onClick={() => setView('generator')}
-              className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-all ${view === 'generator' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/40' : 'text-slate-400'}`}
+              onClick={() => setIsSettingsOpen(true)}
+              className="w-9 h-9 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 rounded-full transition-colors"
             >
-              Generator
-            </button>
-            <button 
-              onClick={() => setView('archive')}
-              className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-all flex items-center gap-1.5 ${view === 'archive' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/40' : 'text-slate-400'}`}
-            >
-              <History size={14} />
-              Arsip
+              <Settings size={18} />
             </button>
           </div>
         </div>
@@ -220,19 +273,31 @@ const App: React.FC = () => {
 
             {cards.length > 0 && !loading && (
               <div className="space-y-10">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-900 pb-6">
-                  <div>
+                <div className="flex flex-col xl:flex-row items-center justify-between gap-6 border-b border-slate-900 pb-6">
+                  <div className="text-center xl:text-left">
                     <h3 className="text-sm font-bold uppercase tracking-widest text-slate-500 mb-1">Hasil Desain</h3>
                     <p className="text-indigo-400 text-lg font-medium">"{prompt}"</p>
                   </div>
-                  <button 
-                    onClick={downloadAll}
-                    disabled={downloading}
-                    className="bg-emerald-600 hover:bg-emerald-500 transition-all px-6 py-3 rounded-xl text-sm font-bold flex items-center gap-2 w-full sm:w-auto justify-center"
-                  >
-                    {downloading ? <Loader2 className="animate-spin" size={16} /> : <Download size={16} />}
-                    Download Batch (10 JPG)
-                  </button>
+                  
+                  <div className="flex flex-col sm:flex-row gap-3 w-full xl:w-auto">
+                    <button 
+                      onClick={handleManualSync}
+                      disabled={isSyncing}
+                      className="bg-slate-800 hover:bg-slate-700 text-white transition-all px-5 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 w-full sm:w-auto border border-slate-700"
+                    >
+                      {isSyncing ? <Loader2 className="animate-spin" size={16} /> : <FileSpreadsheet size={16} />}
+                      Simpan ke Sheet
+                    </button>
+                    
+                    <button 
+                      onClick={downloadAll}
+                      disabled={downloading}
+                      className="bg-emerald-600 hover:bg-emerald-500 transition-all px-6 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 w-full sm:w-auto"
+                    >
+                      {downloading ? <Loader2 className="animate-spin" size={16} /> : <Download size={16} />}
+                      Download Batch (10 JPG)
+                    </button>
+                  </div>
                 </div>
 
                 {/* Adjusted grid for better spacing of 360px fixed width cards */}
