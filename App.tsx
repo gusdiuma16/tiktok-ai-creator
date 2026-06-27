@@ -5,6 +5,7 @@ import { StoryCard, HistorySession } from './types';
 import StoryCardComponent from './components/StoryCardComponent';
 import SettingsModal from './components/SettingsModal';
 import { toJpeg } from 'html-to-image';
+import JSZip from 'jszip';
 import { Loader2, Download, Send, RefreshCw, Layers, History, FileSpreadsheet, ArrowLeft, Trash2, CheckCircle2, CloudLightning, Settings } from 'lucide-react';
 
 const DEFAULT_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxb1TkExgro6xdDOLMtYHenasSyYEf5N9e9HXJtoQ9QRa-kWS86qrmRXBDLrIPsMWkg3Q/exec"; 
@@ -148,8 +149,9 @@ const App: React.FC = () => {
   };
 
   const getSafeFilename = (text: string, index: number) => {
+    const pad = String(index + 1).padStart(2, '0');
     const slug = text.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 20); 
-    return `story-${slug}-${index + 1}.jpg`;
+    return `${pad}-story-${slug}.jpg`;
   };
 
   const downloadSingle = async (index: number) => {
@@ -178,11 +180,13 @@ const App: React.FC = () => {
           link.download = getSafeFilename(prompt, i);
           link.href = dataUrl;
           link.click();
+          // Wait 800ms between each download to ensure browsers allow consecutive triggers
           await new Promise(resolve => setTimeout(resolve, 800));
         }
       }
     } catch (err) {
-      alert("Cek izin pop-up browser Anda.");
+      console.error(err);
+      alert("Gagal mengunduh gambar secara berurutan. Silakan coba simpan secara manual per gambar atau cek izin pop-up browser Anda.");
     } finally {
       setDownloading(false);
     }
@@ -295,7 +299,7 @@ const App: React.FC = () => {
                       className="bg-emerald-600 hover:bg-emerald-500 transition-all px-6 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 w-full sm:w-auto"
                     >
                       {downloading ? <Loader2 className="animate-spin" size={16} /> : <Download size={16} />}
-                      Download Batch (10 JPG)
+                      Download Semua (10 JPG)
                     </button>
                   </div>
                 </div>
@@ -308,6 +312,8 @@ const App: React.FC = () => {
                         <StoryCardComponent 
                           card={card} 
                           innerRef={(el) => { cardRefs.current[idx] = el; }} 
+                          index={idx}
+                          total={cards.length}
                         />
                       </div>
                       <button 

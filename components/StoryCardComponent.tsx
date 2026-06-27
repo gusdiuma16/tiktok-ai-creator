@@ -4,9 +4,11 @@ import { StoryCard } from '../types';
 interface StoryCardProps {
   card: StoryCard;
   innerRef?: React.Ref<HTMLDivElement>;
+  index?: number;
+  total?: number;
 }
 
-const StoryCardComponent: React.FC<StoryCardProps> = ({ card, innerRef }) => {
+const StoryCardComponent: React.FC<StoryCardProps> = ({ card, innerRef, index, total }) => {
   const rawId = useId(); 
   const uniqueId = rawId ? rawId.replace(/[^a-zA-Z0-9]/g, '') : Math.random().toString(36).slice(2);
   const noiseFilterId = `noise-filter-${uniqueId}`;
@@ -123,6 +125,15 @@ const StoryCardComponent: React.FC<StoryCardProps> = ({ card, innerRef }) => {
           gusdiuma
         </span>
       </div>
+
+      {/* 7. MINIMALIST PAGE INDICATOR */}
+      {index !== undefined && (
+        <div className="absolute bottom-10 right-10 z-10 pointer-events-none">
+          <span className={`text-[11px] font-semibold tracking-[0.15em] ${isLightMode ? 'opacity-40' : 'opacity-50'}`} style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+            {String(index + 1).padStart(2, '0')}/{String(total || 10).padStart(2, '0')}
+          </span>
+        </div>
+      )}
       
       <style>{`
         .bg-radial-gradient-vignette {
